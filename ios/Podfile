@@ -1,8 +1,8 @@
-platform :ios, '9.0'
+platform :ios, '14.0'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
 def add_flipper_pods!
-  version = '~> 0.33.1'
+  version = '~> 0.49.0'
   pod 'FlipperKit', version, :configuration => 'Debug'
   pod 'FlipperKit/FlipperKitLayoutPlugin', version, :configuration => 'Debug'
   pod 'FlipperKit/SKIOSNetworkPlugin', version, :configuration => 'Debug'
@@ -13,6 +13,10 @@ end
 # Post Install processing for Flipper
 def flipper_post_install(installer)
   installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings.delete 'IPHONEOS_DEPLOYMENT_TARGET'
+    end
+
     if target.name == 'YogaKit'
       target.build_configurations.each do |config|
         config.build_settings['SWIFT_VERSION'] = '4.1'
@@ -67,9 +71,25 @@ target 'appDemo' do
   # you should disable these next few lines.
   add_flipper_pods!
   post_install do |installer|
+    find_and_replace("../node_modules/react-native/React/CxxBridge/RCTCxxBridge.mm",
+"_initializeModules:(NSArray<id<RCTBridgeModule>> *)modules", "_initializeModules:(NSArray<Class> *)modules")
+    find_and_replace("../node_modules/react-native/ReactCommon/turbomodule/core/platform/ios/RCTTurboModuleManager.mm",
+"RCTBridgeModuleNameForClass(strongModule))", "RCTBridgeModuleNameForClass(Class(strongModule)))")
     flipper_post_install(installer)
   end
-end
+
+def find_and_replace(dir, findstr, replacestr)
+  Dir[dir].each do |name|
+      text = File.read(name)
+      replace = text.gsub(findstr,replacestr)
+      if text != replace
+          puts "Fix: " + name
+          File.open(name, "w") { |file| file.puts replace }
+          STDOUT.flush
+      end
+  end
+  Dir[dir + '*/'].each(&method(:find_and_replace))
+end end
 
 target 'appDemo-tvOS' do
   # Pods for appDemo-tvOS
